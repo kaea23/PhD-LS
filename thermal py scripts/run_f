@@ -1,1 +1,83 @@
+import numpy as np
+import matplotlib.pyplot as plt
+#import time
+#import sys
+#sys.path.append('H:/phase_field/phase_field_alt/')
+from discretisation import grid
+from LS_v2 import C_x
+from fibres import Fibres, Fibre_C_x
+#from LS_Fibre import Lippmann_Schwinger_Fibre
 
+#start = time.time()
+
+# Material Geometry
+L = 1 #m
+nx, ny = 100, 100
+N = 100
+h1 = L/nx
+h2 = L/ny
+
+# Fibre Geometry
+f_num = 2 #number of fibres
+f_r = 0.1 #fibre radius m
+
+#parameters
+C0 = 1.5
+E_bar = np.array([2, 1], dtype = np.float64)
+epsilon = 1e-4
+
+g = grid(nx,ny,L)
+xi = g.init_XI()
+
+j1, j2 = np.meshgrid(np.arange(0, nx, 1),
+                     np.arange(0, ny, 1))
+
+j1 = np.moveaxis(j1, 0, 1)
+j2 = np.moveaxis(j2, 0, 1)
+
+S1 = 0.5
+S2 = 0.5
+
+x1 = (j1+S1)*h1
+x2 = (j2+S2)*h2
+
+
+f_j1, f_j2,f_x1, f_x2 = Fibres(L, N, f_num, f_r, j1, j2, S1, S2, h1, h2)
+
+c_m = C_x(x1,x2,L)
+c_f = Fibre_C_x(f_x1,f_x2,f_r)
+
+#plt.plot(j1, j2, marker='.', color='k', linestyle='none')
+plt.plot(f_j1, f_j2, marker='x', color='k', linestyle='none')
+plt.show()
+
+plt.plot(f_x1, f_x2, marker='x', color='k', linestyle='none')
+plt.show()
+
+#plt.plot(j1, j2, marker='.', color='k', linestyle='none')
+#plt.plot(f_j1, f_j2, marker='x', color='k', linestyle='none')
+#plt.show()
+
+#plt.plot(x1, x2, marker='.', color='k', linestyle='none')
+#plt.plot(f_x1, f_x2, marker='x', color='k', linestyle='none')
+#plt.pcolor(x1, x2, c)
+#plt.show()
+
+#E_n = Lippmann_Schwinger_Fibre(C0, N, xi, c_m, c_f, E_bar, L, epsilon)
+
+#Testing
+
+#Average_E_bar_1 =  (np.sum(E_n[...,0]))/ N**2 
+#Average_E_bar_2 =  (np.sum(E_n[...,1]))/ N**2 
+
+#print("Average_E_bar:", Average_E_bar_1, Average_E_bar_2 )
+
+#plt.title('$E_1(x)$')
+#plt.pcolor(x1, x2, E_n[...,0])
+#plt.colorbar()
+#plt.show()
+
+#plt.title('$E_2(x)$')
+#plt.pcolor(x1, x2, E_n[...,1])
+#plt.colorbar()
+#plt.show()
