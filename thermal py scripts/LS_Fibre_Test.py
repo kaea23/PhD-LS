@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.fft import fftn, ifftn
 
-def Lippmann_Schwinger_Fibre(C0, N, xi, c_f, c_m, f_position1, E_bar, L, epsilon):
+def Lippmann_Schwinger_Fibre(C0, N, xi, c_f, c_m, f_position, E_bar, L, epsilon):
     ndims = 2
     # E_0 = (N,2) = (nx,ny,2)
     # E_0 = E_bar
@@ -11,14 +11,10 @@ def Lippmann_Schwinger_Fibre(C0, N, xi, c_f, c_m, f_position1, E_bar, L, epsilon
     
     E_n =  np.zeros_like(E_0)
     
-    #E_tilde_m =  np.zeros_like(E_0)
-    E_tilde =  np.zeros_like(E_0)
-    #E_tilde_m_hat = np.zeros_like(E_0, dtype=np.complex128)
+    E_tilde =  np.zeros((N,N,ndims)) 
     E_tilde_hat = np.zeros_like(E_0, dtype=np.complex128)
-    
-    #tau_m = np.zeros((N,N,ndims))
+
     tau = np.zeros((N,N,ndims))
-    #tau_m_hat = np.zeros_like(tau_m, dtype=np.complex128)
     tau_hat = np.zeros_like(tau, dtype=np.complex128)
     
     # (ξ·ξ)/||(ξ)||^2
@@ -32,23 +28,26 @@ def Lippmann_Schwinger_Fibre(C0, N, xi, c_f, c_m, f_position1, E_bar, L, epsilon
     norm2[0,0] = 1.
     G = xi_xi / norm2 #keep axis
     G = G/C0
+    G[0,0,...] = 0
     
-    if f_position1.any == 1:
-        # τ0 (x) ← c(x) · E0(x) − C0 * E0(x)
-        for i in range(ndims):
-            tau[...,i] = c_f * E_0[...,i] - C0* E_0[...,i]
-    else:
-        # τ0 (x) ← c(x) · E0(x) − C0 * E0(x)
-        for i in range(ndims):
-            tau[...,i] = c_m * E_0[...,i] - C0* E_0[...,i]
- 
+    c = np.where(f_position,c_f,c_m)
+    
+    # τ0 (x) ← c(x) · E0(x) − C0 * E0(x)
+    for i in range(ndims):
+        tau[...,i] = c * E_0[...,i] - C0 * E_0[...,i]
+
     iteration = 0
     
     while True:
-        iteration += 1 
+        iteration += 1
+        
+        if np.isnan(tau).any() or np.isinf(tau).any():
+            print("NaN or inf detected in tau at iteration %d" %(iteration))
+            break
         
         for i in range(ndims):
             tau_hat[...,i] = fftn(tau[...,i], workers=-1)
+            
         
         # Apply Green operator
         E_tilde_hat[...,0] = - ( G[...,0] * tau_hat[...,0] + G[...,2] * tau_hat[...,1] )
@@ -58,25 +57,24 @@ def Lippmann_Schwinger_Fibre(C0, N, xi, c_f, c_m, f_position1, E_bar, L, epsilon
         E_tilde[...,0] = ifftn(E_tilde_hat[...,0]).real
         E_tilde[...,1] = ifftn(E_tilde_hat[...,1]).real
         
-        
         for i in range(ndims):
-            E_n[...,i] = E_bar[i] + E_tilde[...,i]
+            E_n[...,i] = E_bar[i] + E_tilde[...,i] 
         
+        if np.isnan(E_n).any() or np.isinf(E_n).any():
+            print("NaN or inf detected in E_n at iteration %d" %(iteration))
+            break
+
         #crit = ||E_n - E_0||
         crit = np.sqrt(np.sum((E_n - E_0)**2))
+        #print('crit', crit) 
 
         if crit < epsilon:
             print('  Iteration %d - crit (%.3e) smaller than epsilon '%(iteration, crit))
             break
         
-        if f_position1 == 1:
-            # τ0 (x) ← c(x) · E0(x) − C0 * E0(x)
-            for i in range(ndims):
-                tau[...,i] = c_f * E_n[...,i] - C0* E_n[...,i]
-        else:
-            # τ0 (x) ← c(x) · E0(x) − C0 * E0(x)
-            for i in range(ndims):
-                tau[...,i] = c_m * E_n[...,i] - C0* E_n[...,i]
+        # τn (x) ← c(x) · En(x) − C0 * En(x)
+        for i in range(ndims):
+            tau[...,i] = c * E_n[...,i] - C0 * E_n[...,i]
 
         E_0 = np.copy(E_n)
                 
