@@ -1,69 +1,62 @@
 import numpy as np
-import random
 
-def Fibres(L, N, f_num, f_r, j1, j2, S1, S2, h1, h2):
+def Fibres(L, N, f_num, f_r):
+    h1, h2 = L/N, L/N
     
-    r_crit = 0.5*L
-    
-    if f_r > r_crit:
-        print('  Fibre radius too large, must be less than %d m '%(r_crit))
-        
-           
     A_mat = L*L
     A_f = f_num*np.pi*(f_r)**2 
     f_percent = (A_f/A_mat)*100
     
-    print(A_mat) #good
-    print(A_f)   #good
-    
     fx_center = np.zeros(f_num)
     fy_center = np.zeros(f_num)
     
-    print(fx_center.shape) #good
+    #for i in range (f_num):
+    #    fx_center[i] = random.randint(0, int(L * 100)) / 100.0
+    #    fy_center[i] = random.randint(0, int(L * 100)) / 100.0
+    fx_center = np.random.uniform(low=0, high=L, size=f_num)
+    fy_center = np.random.uniform(low=0, high=L, size=f_num)
     
-    for i in range (f_num):
-        fx_center[i] = random.randint(0, int(L * 100)) / 100.0
-        fy_center[i] = random.randint(0, int(L * 100)) / 100.0
+    print('x centre',fx_center) 
+    print('y centre',fy_center) 
     
-    print('x centre',fx_center) #good
-    print('y centre',fy_center) #good
+    f_position = np.full((N,N), False, dtype=bool)
     
-    f_j1 = np.zeros_like(j1)
-    f_j2 = np.zeros_like(j2)
-    
-    print(f_j1.shape) #good
-    print(f_j2.shape) #good
-    
-    for i in range (f_num):
-        print('fx:',fx_center[i])
-        print('fy:',fy_center[i])
-        for j in range (N):
-            for k in range (N):
-                x = j * h1
-                y = k * h2
-                if (x - fx_center[i])**2 + (y - fy_center[i])**2 <= f_r**2:
-                    f_j1[j,k] = j
-                    f_j2[j,k] = k
-                    
-    print('f_j1',f_j1) #good
-    print('f_j1',f_j1) #good        
-               
-    f_x1 = (f_j1+S1)*h1
-    f_x2 = (f_j2+S2)*h2
-    
-    print('f_x1',f_x1) #good i think
-    print('f_x1',f_x1) #good i think
+    #for i in range (f_num):
+    #    for j in range (N):
+    #        for k in range (N):
+    #            x = j * h1
+    #            y = k * h2
+    #            if (x - fx_center[i])**2 + (y - fy_center[i])**2 <= f_r**2:
+    #                f_position[j,k] = 1
+        
+    x, y = np.meshgrid(np.arange(0,N), np.arange(0,N))
+    for i in range(f_num):
+        idx = (x*h1-fx_center[i])**2 + (y*h2-fy_center[i])**2 <= f_r**2
+        f_position[idx] = 1
     
     print('  Fibre volume percentage %.2f  %%'%(f_percent))
+    return f_position, fy_center
     
-    return f_j1, f_j2, f_x1, f_x2
 
-def Fibre_C_x(f_x1,f_x2,f_r):
+
+"""
+def Fibre_C_x(x1,x2,f_r):
     
     # c matrix will have appearance of c(x)I of dim n x n = nx x ny
     
-    k1 = (2. * np.pi * f_x1 / f_r)
-    k2 = (2. * np.pi * f_x2 / f_r)
+    k1 = (2. * np.pi * x1 / f_r)
+    k2 = (2. * np.pi * x2 / f_r)
     c = 1/(0.5 + (np.cos(k1))**2 + (np.cos(k2))**2 + (np.cos(k1))**4 + (np.cos(k2))**6 )
             
     return c
+
+def Mat_C_x(x1,x2,L):
+    
+    # c matrix will have appearance of c(x)I of dim n x n = nx x ny
+    
+    k1 = (2. * np.pi * x1 / L)
+    k2 = (2. * np.pi * x2 / L)
+    c = 1/(0.5 + (np.cos(k1))**2 + (np.cos(k2))**2 + (np.cos(k1))**4 + (np.cos(k2))**6 )
+            
+    return c
+"""
