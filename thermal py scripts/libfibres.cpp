@@ -2,7 +2,7 @@
  *
  * Compile with
  *
- *    g++ -fPIC -shared -O3 -o libfibres.so libfibres.cc
+ *    g++ -shared -O3 -o libfibres.dll libfibres.ccp
  *
  * Reference:
  *    Yang Chen (2022): "Towards a data fusion framework: combining multi-modal
