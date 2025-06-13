@@ -1,3 +1,9 @@
+"""
+Created on Tue Jun 10 11:08:38 2025
+
+@author: kaea23
+"""
+
 """Distributions that represent artificial distribution of fibres in the domain
 
 This module contains classes that allow to generate a distribution of fibres in 2D and
@@ -15,9 +21,14 @@ import tempfile
 import ctypes
 import subprocess
 
+
 import itertools
 import numpy as np
 from scipy.stats import norm
+
+mingw_path = r"C:\MinGW\mingw64\bin"
+os.environ["PATH"] += os.pathsep + mingw_path
+#subprocess.run(["g++", "--version"])
 
 
 __all__ = ["FibreRadiusDistribution", "FibreDistribution2d"]
@@ -77,20 +88,19 @@ class FibreDistribution2d:
 
     Based on the Matlab code provided by Yang Chen, Fig. 15 in the above reference.
     """
+   
 
     def __init__(
         self,
         N,
         domain_size,
-        volume_fraction=0.55,
-        r_fibre_dist=FibreRadiusDistribution(
-            r_avg=7.5e-3, r_min=5.0e-3, r_max=10.0e-3, sigma=0.5e-3, gaussian=True
-        ),
-        kdiff_background=1.0,
-        kdiff_fibre=0.1,
-        seed=141517,
-        fast_code=True,
-    ):
+        r_fibre_dist,
+        volume_fraction,
+        kdiff_background,
+        kdiff_fibre,
+        fast_code,
+        seed=141517):
+        
         """Initialise new instance
 
         :arg N: number of grid cells
@@ -109,12 +119,14 @@ class FibreDistribution2d:
         self._kdiff_background = kdiff_background
         self._kdiff_fibre = kdiff_fibre
         self._rng = np.random.default_rng(seed=seed)
+        
         # Vertices of the grid onto which the diffusion coefficient is projected
         h = self.domain_size / self.N
         X = np.arange(0, self.domain_size + h / 2, h)
         self._vertices = np.asarray(
             [(y, x) for (x, y) in itertools.product(X, repeat=2)]
         ).reshape([len(X) ** 2, 2])
+        
         # compute initial fibre locations, arranged in a regular grid
         n_fibres_per_direction = int(
             round(
@@ -123,6 +135,7 @@ class FibreDistribution2d:
                 * np.sqrt(self._volume_fraction / np.pi)
             )
         )
+        
         # fibre diameter
         d_fibre = 2 * self._r_fibre_dist.r_avg
         X0 = (
@@ -130,27 +143,46 @@ class FibreDistribution2d:
             * np.arange(0, (n_fibres_per_direction - 0.5) * d_fibre, d_fibre)
             / (d_fibre * n_fibres_per_direction)
         )
+        
         self._initial_fibre_locations = np.asarray(
             [p for p in itertools.product(X0, repeat=2)]
         ).reshape([len(X0) ** 2, 2])
+        
         self._fast_code = fast_code
+        
+  
         if self._fast_code:
             lib_path, _ = os.path.split(os.path.realpath(__file__))
-            source_file = os.path.join(lib_path, "libfibres.cc")
+            source_file = os.path.join(lib_path, "libfibres.cpp")
+            print("CPP exists:", os.path.exists(source_file)) 
+            print("CPP path:", source_file)
+            
             with tempfile.TemporaryDirectory() as tmp_dir:
-                lib_file = os.path.join(tmp_dir, "libfibres.so")
+                #lib_file = os.path.join(tmp_dir, "libfibres.so")
+                lib_file = os.path.join(tmp_dir, "libfibres.dll")
                 try:
                     subprocess.run(
-                        ["g++", "-fPIC", "-shared", "-O3", "-o", lib_file, source_file],
+                        #["g++", "-fPIC", "-shared", "-O3", "-o", lib_file, source_file], "-m64",
+                        ["g++", "-shared", "-O3", "-o", lib_file, source_file],
                         check=True,
                     )
+                    print("DLL exists:", os.path.exists(lib_file)) 
+                    print("DLL path:", lib_file)
+                    
+                    
                 except subprocess.CalledProcessError as e:
                     print("Error compiling C++ code for fibre distribution: " + str(e))
                     print("Falling back to Python implementation.")
                     self._fast_code = False
+                
+                LIB = ctypes.CDLL(lib_file) 
+                
                 if self._fast_code:
                     # Load the shared library
-                    self._fast_dist_periodic = ctypes.CDLL(lib_file).dist_periodic
+                    #LIB = ctypes.CDLL(lib_file)
+                    #self._fast_dist_periodic = ctypes.CDLL(r"C:\Users\kaea23\AppData\Local\Temp\tmpkl0b3y6n\libfibres.dll").dist_periodic
+                    #self._fast_dist_periodic = ctypes.CDLL(lib_file).dist_periodic
+                    self._fast_dist_periodic = LIB.dist_periodic
                     self._fast_dist_periodic.argtypes = [
                         ctypes.c_int,
                         np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
@@ -159,14 +191,18 @@ class FibreDistribution2d:
                         np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
                     ]
 
-                    initialise_rng = ctypes.CDLL(lib_file).initialise_rng
+                    #initialise_rng = ctypes.CDLL(r"C:\Users\kaea23\AppData\Local\Temp\tmpkl0b3y6n\libfibres.dll").initialise_rng
+                    #initialise_rng = ctypes.CDLL(lib_file).initialise_rng
+                    initialise_rng = LIB.initialise_rng
                     initialise_rng.argtypes = [
                         ctypes.c_uint,
                         ctypes.POINTER(ctypes.c_uint),
                         ctypes.c_char_p,
                     ]
 
-                    self._fast_move_fibres = ctypes.CDLL(lib_file).move_fibres
+                    #self._fast_move_fibres = ctypes.CDLL(r"C:\Users\kaea23\AppData\Local\Temp\tmpkl0b3y6n\libfibres.dll").move_fibres
+                    #self._fast_move_fibres = ctypes.CDLL(lib_file).move_fibres
+                    self._fast_move_fibres = LIB.move_fibres
                     self._fast_move_fibres.argtypes = [
                         ctypes.c_uint,
                         ctypes.c_double,
@@ -187,15 +223,22 @@ class FibreDistribution2d:
                     initialise_rng(
                         seed, ctypes.byref(self._rng_state_length), self._rng_state
                     )
+                    
+                    
+                    
 
     def __iter__(self):
         """Iterator over dataset"""
         num_repeats = 30
         it_max_ovlap = 5000
-        eps_fibres = 3.0e-4
+        eps_fibres = 0.5e-6
+        #eps_fibres = 3.0e-4
+        
         while True:
+            
             r_fibres = self._r_fibre_dist.draw(self._initial_fibre_locations.shape[0])
             fibre_locations = np.array(self._initial_fibre_locations)
+            
             if self._fast_code:
                 n_fibres = r_fibres.shape[0]
                 self._fast_move_fibres(
@@ -213,10 +256,9 @@ class FibreDistribution2d:
                 fibre_locations = self._move_fibres(
                     fibre_locations,
                     r_fibres,
-                    num_repeats=30,
-                    it_max_ovlap=5000,
-                    eps_fibres=3.0e-4,
-                )
+                    num_repeats,
+                    it_max_ovlap,
+                    eps_fibres)
             # Project onto grid
             alpha = np.log(self._kdiff_background) * np.ones(
                 shape=((self.N + 1) * (self.N + 1))
@@ -224,17 +266,18 @@ class FibreDistribution2d:
             for p, r in zip(fibre_locations, r_fibres):
                 dist = self._dist_periodic(p, self._vertices)
                 alpha[np.where(dist < r)] = np.log(self._kdiff_fibre)
+            
             alpha = np.reshape(alpha, (self.N + 1, self.N + 1))
             yield alpha
+            
 
     def _move_fibres(
         self,
         fibre_locations,
         r_fibres,
-        num_repeats=30,
-        it_max_ovlap=5000,
-        eps_fibres=3.0e-4,
-    ):
+        num_repeats,
+        it_max_ovlap,
+        eps_fibres):
         """Randomly move the fibres according to the algorithm by Yang Chen
 
         Returns the new fibre locations.
@@ -257,8 +300,21 @@ class FibreDistribution2d:
                 r_j = r_fibres[labels[j]]
                 dist = self._dist_periodic(p_j, fibre_locations)
                 dist[labels[j]] = np.inf
-                ur_sc = np.mean(sorted(dist)[:3])
+                #ur_sc = np.mean(sorted(dist)[:3])
+                
+                ### FIX
+                
+                mask = np.ones_like(dist, dtype=bool)
+                mask[labels[j]] = False
+                valid_dists = dist[mask]
 
+                if valid_dists.size >= 3: 
+                    ur_sc = np.mean(sorted(valid_dists)[:3])
+                else: 
+                    ur_sc = self.domain_size / np.sqrt(n_fibres) 
+                   
+                ###
+                
                 dimin = 0
                 counter = 0
                 n_ovlap0 = np.inf
@@ -288,6 +344,8 @@ class FibreDistribution2d:
                 fibre_locations[labels[j], :] = p_j_new[:]
             k += 1
         return fibre_locations
+    
+
 
     def _dist_periodic(self, p, q):
         """Compute periodic distance between point p and array of points q
