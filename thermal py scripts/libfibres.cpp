@@ -2,7 +2,7 @@
  *
  * Compile with
  *
- *    g++ -shared -O3 -o libfibres.dll libfibres.cpp
+ *    g++ -m64 -shared -O3 -o libfibres.dll libfibres.cpp
  *
  * Reference:
  *    Yang Chen (2022): "Towards a data fusion framework: combining multi-modal
