@@ -20,16 +20,13 @@ import os
 import tempfile
 import ctypes
 import subprocess
-
-
+import shutil
+import uuid
 import itertools
 import numpy as np
 from scipy.stats import norm
 
-mingw_path = r"C:\MinGW\mingw64\bin"
-os.environ["PATH"] += os.pathsep + mingw_path
-#subprocess.run(["g++", "--version"])
-
+os.environ["PATH"] = r"C:\MinGW\mingw64\bin" + os.pathsep + os.environ["PATH"]
 
 __all__ = ["FibreRadiusDistribution", "FibreDistribution2d"]
 
@@ -150,38 +147,58 @@ class FibreDistribution2d:
         
         self._fast_code = fast_code
         
-  
         if self._fast_code:
             lib_path, _ = os.path.split(os.path.realpath(__file__))
             source_file = os.path.join(lib_path, "libfibres.cpp")
+            
             print("CPP exists:", os.path.exists(source_file)) 
             print("CPP path:", source_file)
             
             with tempfile.TemporaryDirectory() as tmp_dir:
-                #lib_file = os.path.join(tmp_dir, "libfibres.so")
                 lib_file = os.path.join(tmp_dir, "libfibres.dll")
                 try:
-                    subprocess.run(
-                        #["g++", "-fPIC", "-shared", "-O3", "-o", lib_file, source_file], "-m64",
-                        ["g++", "-shared", "-O3", "-o", lib_file, source_file],
+                    result = subprocess.run(
+                        ["g++", "-m64", "-shared", "-O3", "-o", lib_file, source_file],
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE,
+
                         check=True,
                     )
+                    
                     print("DLL exists:", os.path.exists(lib_file)) 
                     print("DLL path:", lib_file)
                     
+                    print("STDOUT:", result.stdout) 
+                    print("STDERR:", result.stderr)
                     
+                    # Copy to a persistent location 
+                    unique_name = f"libfibres_{uuid.uuid4().hex}.dll" 
+                    lib_file_persist = os.path.join(os.path.dirname(__file__), unique_name)
+
+                    if os.path.exists(lib_file_persist): 
+                        try: 
+                            os.remove(lib_file_persist) 
+                        except PermissionError: 
+                            print("DLL is in use and cannot be overwritten.") 
+                            self._fast_code = False 
+                            return
+
+                    shutil.copy(lib_file, lib_file_persist)
+
                 except subprocess.CalledProcessError as e:
                     print("Error compiling C++ code for fibre distribution: " + str(e))
                     print("Falling back to Python implementation.")
                     self._fast_code = False
                 
-                LIB = ctypes.CDLL(lib_file) 
                 
                 if self._fast_code:
                     # Load the shared library
-                    #LIB = ctypes.CDLL(lib_file)
-                    #self._fast_dist_periodic = ctypes.CDLL(r"C:\Users\kaea23\AppData\Local\Temp\tmpkl0b3y6n\libfibres.dll").dist_periodic
-                    #self._fast_dist_periodic = ctypes.CDLL(lib_file).dist_periodic
+                    
+                    print("Checking if DLL was copied:", os.path.exists(lib_file_persist)) 
+                    print("DLL path:", lib_file_persist)
+
+                    LIB = ctypes.CDLL(lib_file_persist) 
+
                     self._fast_dist_periodic = LIB.dist_periodic
                     self._fast_dist_periodic.argtypes = [
                         ctypes.c_int,
@@ -191,8 +208,7 @@ class FibreDistribution2d:
                         np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
                     ]
 
-                    #initialise_rng = ctypes.CDLL(r"C:\Users\kaea23\AppData\Local\Temp\tmpkl0b3y6n\libfibres.dll").initialise_rng
-                    #initialise_rng = ctypes.CDLL(lib_file).initialise_rng
+
                     initialise_rng = LIB.initialise_rng
                     initialise_rng.argtypes = [
                         ctypes.c_uint,
@@ -200,8 +216,7 @@ class FibreDistribution2d:
                         ctypes.c_char_p,
                     ]
 
-                    #self._fast_move_fibres = ctypes.CDLL(r"C:\Users\kaea23\AppData\Local\Temp\tmpkl0b3y6n\libfibres.dll").move_fibres
-                    #self._fast_move_fibres = ctypes.CDLL(lib_file).move_fibres
+
                     self._fast_move_fibres = LIB.move_fibres
                     self._fast_move_fibres.argtypes = [
                         ctypes.c_uint,
@@ -224,15 +239,13 @@ class FibreDistribution2d:
                         seed, ctypes.byref(self._rng_state_length), self._rng_state
                     )
                     
-                    
-                    
 
     def __iter__(self):
         """Iterator over dataset"""
         num_repeats = 30
         it_max_ovlap = 5000
-        eps_fibres = 0.5e-6
-        #eps_fibres = 3.0e-4
+        eps_fibres = 3.0e-7
+        #eps_fibres = 3.0e-4 #original
         
         while True:
             
