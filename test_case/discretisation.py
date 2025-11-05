@@ -30,10 +30,10 @@ class grid:
             
             if self.ndims == 2: 
         
-                jj,ii = np.meshgrid(jj, ii)
+                ii,jj = np.meshgrid(ii, jj,  indexing='ij')
         
                 xi = np.zeros((self.nx, self.ny, self.ndims))
-        
+                
                 xi[:,:,0] =  2.*np.sin(ii) /self.h1
                 xi[:,:,1] =  2.*np.sin(jj) /self.h2
                 
@@ -43,7 +43,7 @@ class grid:
 
                 kk = np.pi * fftfreq(self.nz, 1./self.nz) / self.nz
         
-                kk,jj,ii = np.meshgrid(kk, jj, ii)
+                ii,jj,kk = np.meshgrid(ii, jj, kk, indexing='ij')
         
                 xi = np.zeros((self.nx, self.ny, self.nz, self.ndims))
         
@@ -58,7 +58,7 @@ class grid:
             
             if self.ndims == 2: 
                 
-                jj,ii = np.meshgrid(jj, ii)
+                ii,jj = np.meshgrid(ii, jj, indexing='ij')
         
                 xi = np.zeros((self.nx, self.ny, self.ndims))
         
@@ -71,7 +71,7 @@ class grid:
             
                 kk = np.pi * fftfreq(self.nz, 1./self.nz) / self.nz
         
-                kk,jj,ii = np.meshgrid(kk, jj, ii)
+                ii,jj,kk = np.meshgrid(ii, jj, kk, indexing='ij')
         
                 xi = np.zeros((self.nx, self.ny, self.nz, self.ndims))
         
@@ -83,5 +83,3 @@ class grid:
             raise ValueError(f"Unknown scheme '{scheme}'. Supported schemes are 'S' and 'H'.")
             
         return xi
-    
-
