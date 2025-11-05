@@ -11,8 +11,89 @@ import time
 from discretisation import grid
 from fibre_test_case import Fibre
 from LS_test_case import Lippmann_Schwinger_Fibre
+#from math_comparison_test_case import mathcomp
 
 start = time.time()
+
+def math_comp(f_r):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+
+    # Parameters
+    R = f_r        # Radius of the fibre
+    E0x = 2.0      # External field magnitude in x-direction
+    E0y = 2.0      # External field magnitude in y-direction
+    kappa = 0.5    # Conductivity ratio
+
+    # Define Cartesian grid
+    x = np.linspace(-1, 1, 500)
+    y = np.linspace(-1, 1, 500)
+    X, Y = np.meshgrid(x, y, indexing='ij')
+
+    # Convert to polar coordinates
+    RHO = np.sqrt(X**2 + Y**2)
+    THETA = np.arctan2(Y, X)
+
+    # Unit vectors in polar coordinates
+    cos_theta = np.cos(THETA)
+    sin_theta = np.sin(THETA)
+
+
+    # Electric field components X direction
+    Ein_phi_x = -(2 * kappa / (1 + kappa)) *E0x*RHO*cos_theta
+    Eout_phi_x = (-1 + (1 - kappa) / (1 + kappa) * (R**2 / RHO**2)) *E0x*RHO*cos_theta
+
+    # Electric field components Y direction
+    Ein_phi_y = -(2 * kappa / (1 + kappa)) *E0y*RHO*sin_theta
+    Eout_phi_y = (-1 + (1 - kappa) / (1 + kappa) * (R**2 / RHO**2)) *E0y*RHO*sin_theta
+
+    # Combine based on region
+    Phi_x = np.where(RHO <= R, Ein_phi_x, Eout_phi_x)
+    Phi_y = np.where(RHO <= R, Ein_phi_y, Eout_phi_y)
+
+    # Compute gradient of scalar potential (negative gradient gives electric field)
+    dx = x[1] - x[0]
+    dy = y[1] - y[0]
+    Ex,miscy = np.gradient(-Phi_x, dx, dy)
+    Ey,miscx = np.gradient(-Phi_y, dx, dy)
+
+    # Mask singularity at origin
+    Ex = np.where(RHO < 0.0001, np.nan, Ex)
+    Ey = np.where(RHO < 0.0001, np.nan, Ey)
+
+    #Plot Ex component
+    plt.figure(figsize=(8, 6))
+    contour_ex = plt.contourf(X, Y, Ex, levels=500, cmap='seismic', vmin=1.4, vmax=2.8)
+    cbar = plt.colorbar(contour_ex)
+    cbar.set_label(r"$\nabla V_{E}$ ($ V $)", fontsize=14)
+    cbar.ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+    #circle_ex = plt.Circle((0, 0), R, color='black', fill=False, linewidth=0.2)
+    #plt.gca().add_patch(circle_ex)
+    plt.title('Electric Field Ex Component', fontsize=14)
+    plt.xlabel('X (m)', fontsize=14)
+    plt.ylabel('Y (m)', fontsize=14)
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.tight_layout()
+    plt.show()
+
+    # Plot Ey component
+    plt.figure(figsize=(8, 6))
+    contour_ey = plt.contourf(X, Y, Ey, levels=500, cmap='seismic', vmin=-0.7, vmax=0.7)
+    cbar = plt.colorbar(contour_ey)
+    cbar.set_label(r"$\nabla V_{E}$ ($ V $)", fontsize=14)
+    cbar.ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.1f'))
+    #circle_ey = plt.Circle((0, 0), R, color='black', fill=False, linewidth=0.2)
+    #plt.gca().add_patch(circle_ey)
+    plt.title('Electric Field Ey Component', fontsize=14)
+    plt.xlabel('X (m)', fontsize=14)
+    plt.ylabel('Y (m)', fontsize=14)
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.tight_layout()
+    plt.show()
+    
+    return Ex,Ey,kappa,R,RHO
+
 
 """
 MATERIAL GEOMETRY
@@ -23,11 +104,11 @@ centre: True = centrized grid, False = non-centrized grid
 scheme: S or H
 """
 L = 2
-N = 1000
+N = 500
 S = 0.5
 ndims = 2
 centre = True
-scheme = 'S'
+scheme = 'H'
 
 """
 FIBRE GEOMETRY
@@ -41,10 +122,9 @@ f_r = 0.25
 PARAMETERS
 E_bar: average temp gradient (-ve)
 epsilon: convergence criteria
-c_f: fibre thermal conductivity in W/mK [2]
-c_m: matrix thermal conductivity in W/mK [2]
+c_f: fibre thermal conductivity in W/mK 
+c_m: matrix thermal conductivity in W/mK 
 C0: constant ( if too low can diverge)
-k: kappa 1/2
 """
 
 E_bar = np.array([2, 0], dtype = np.float64) 
@@ -52,10 +132,6 @@ epsilon = 1e-12
 c_f = 2
 c_m = 1
 C0 = (c_f + c_m)/2 
-
-k = c_m/c_f
-
-E_bar = E_bar / ( 1 + ( np.pi *(1 - k * f_r**2)/(1 + k * L**2) ) )
 
 if ndims == 2: 
     nx, ny, nz = N, N, 0 
@@ -71,10 +147,6 @@ if ndims == 2:
         j1, j2 = np.meshgrid(np.arange(0, nx, 1),
                              np.arange(0, ny, 1),
                              indexing='ij')
-
-    j1 = np.moveaxis(j1, 0, 1)
-    j2 = np.moveaxis(j2, 0, 1)
-
     x1 = (j1+S)*h1
     x2 = (j2+S)*h2
     
@@ -95,11 +167,6 @@ elif ndims == 3:
                                  np.arange(0, ny, 1),
                                  np.arange(0, nz, 1),
                                  indexing='ij')
-        
-    j1 = np.moveaxis(j1, 0, 1)
-    j2 = np.moveaxis(j2, 0, 1)
-    j3 = np.moveaxis(j3, 0, 1)
-
     x1 = (j1+S)*h1
     x2 = (j2+S)*h2
     
@@ -112,40 +179,81 @@ xi = g.init_XI(scheme)
 
 f_position, fy_center = Fibre(L, N, f_num, f_r)
 
-E_n, c = Lippmann_Schwinger_Fibre(C0, L, N, xi, c_f, c_m, f_position, E_bar, epsilon, ndims, scheme)
+E_n, c, comp_E_0 = Lippmann_Schwinger_Fibre(C0, L, N, xi, c_f, c_m, f_position, E_bar, epsilon, ndims, scheme)
 
-y_index = int(fy_center[0]/h2)
-x_coords = np.linspace(-L/2, L/2, N)
+Ex,Ey,kappa,R,RHO =  math_comp(f_r)
 
-plt.title('FFT Gradient Temperature Profile Along y = 0')
-plt.xlabel('x-coordinate')
-plt.ylabel(r'$\nabla$ T')
-plt.plot(x_coords, E_n[y_index, :, 0], label='$E_1(x)$')
-plt.plot(x_coords, E_n[y_index, :, 1], label='$E_2(x)$')
+plt.figure(figsize=(8, 6))
+plt.title('FFT $E_1(x)$', fontsize=14)
+plt.xlabel("X (m)", fontsize=14)
+plt.ylabel("Y (m)", fontsize=14)
+plt.pcolor(x1, x2, E_n[...,0], vmin=1.4, vmax=2.8)
+plt.set_cmap("seismic")
+plt.gca().set_aspect('equal', adjustable='box')
+cbar = plt.colorbar()
+cbar.set_label(r"$\nabla$ T ($ K m^{-1} $)", fontsize=14)
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(8, 6))
+plt.title('FFT $E_2(x)$', fontsize=14)
+plt.xlabel("X (m)", fontsize=14)
+plt.ylabel("Y (m)", fontsize=14)
+plt.pcolor(x1, x2, E_n[...,1], vmin=-0.7, vmax=0.7)
+plt.set_cmap("seismic")
+plt.gca().set_aspect('equal', adjustable='box')
+cbar = plt.colorbar()
+cbar.set_label(r"$\nabla$ T ($ K m^{-1} $)", fontsize=14)
+plt.tight_layout()
+plt.show()
+
+# Difference maps
+diff_Ex_En0 = E_n[..., 0] - Ex
+diff_Ey_En1 = E_n[..., 1] - Ey
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+# First difference map
+im1 = axes[0].imshow(diff_Ex_En0, cmap='seismic', extent=[-1, 1, -1, 1])
+axes[0].set_title('Difference X component: FFT - Analytical solution', fontsize=14)
+axes[0].set_xlabel("X (m)", fontsize=14)
+axes[0].set_ylabel("Y (m)", fontsize=14)
+# Second difference map
+im2 = axes[1].imshow(diff_Ey_En1, cmap='seismic', extent=[-1, 1, -1, 1])
+axes[1].set_title('Difference Y component: FFT - Analytical solution', fontsize=14)
+axes[1].set_xlabel("X (m)", fontsize=14)
+axes[1].set_ylabel("Y (m)", fontsize=14)
+# Colorbars for each subplot
+fig.colorbar(im1, ax=axes[0])
+fig.colorbar(im2, ax=axes[1])
+plt.tight_layout()
+plt.show()
+
+# Line profiles
+center_idx = Ex.shape[0] // 2
+x = np.linspace(-1, 1, Ex.shape[1])
+plt.figure(figsize=(8, 6))
+plt.plot(x, Ex[center_idx, :], label='Ex (Analytical)')
+plt.plot(x, E_n[center_idx, :, 0], label='$E_1(x)$ (FFT)')
 plt.legend()
-plt.grid(True)
+plt.title('Line Profile: X component', fontsize=14)
+plt.xlabel("X (m)", fontsize=14)
+plt.ylabel(r"gradient $\nabla$", fontsize=14)
 plt.show()
 
-plt.title('FFT $E_1(x)$')
-plt.xlabel("X (m)")
-plt.ylabel("Y (m)")
-plt.pcolor(x1, x2, E_n[...,0])
-plt.set_cmap("nipy_spectral")
-cbar = plt.colorbar()
-cbar.set_label(r"$\nabla$ T ($ K m^{-1} $)")
-plt.tight_layout()
+plt.figure(figsize=(8, 6))
+plt.plot(x, Ey[center_idx, :], label='Ey (Analytical)')
+plt.plot(x, E_n[center_idx, :, 1], label='$E_2(x)$(FFT)')
+plt.legend()
+plt.title('Line Profile: Y component', fontsize=14)
+plt.xlabel("X (m)", fontsize=14)
+plt.ylabel(r"gradient $\nabla$", fontsize=14)
 plt.show()
 
-plt.title('FFT $E_2(x)$')
-plt.xlabel("X (m)")
-plt.ylabel("Y (m)")
-plt.pcolor(x1, x2, E_n[...,1])
-plt.set_cmap("nipy_spectral")
-cbar = plt.colorbar()
-cbar.set_label(r"$\nabla$ T ($ K m^{-1} $)")
-plt.tight_layout()
-plt.show()
+# Correction term
+#correction_term = ((1 - kappa) / (1 + kappa)) * (R**2 / RHO**2)
+#correction_term = np.where(RHO < 0.0001, np.nan, correction_term)
 
 end = time.time()
 runtime = end-start
 print(runtime)
+
