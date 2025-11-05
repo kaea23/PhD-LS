@@ -7,6 +7,8 @@ Created on Wed Jul 16 15:28:25 2025
 
 import numpy as np
 
+# For single fibre in centre of domain
+
 def Fibre(L, N, f_num, f_r):
     h1, h2 = L/N, L/N
     
@@ -29,26 +31,4 @@ def Fibre(L, N, f_num, f_r):
     
     print('  Fibre volume percentage %.2f  %%'%(f_percent))
     return f_position, fy_center
-    
 
-"""
-def Fibre_C_x(x1,x2,f_r):
-    
-    # c matrix will have appearance of c(x)I of dim n x n = nx x ny
-    
-    k1 = (2. * np.pi * x1 / f_r)
-    k2 = (2. * np.pi * x2 / f_r)
-    c = 1/(0.5 + (np.cos(k1))**2 + (np.cos(k2))**2 + (np.cos(k1))**4 + (np.cos(k2))**6 )
-            
-    return c
-
-def Mat_C_x(x1,x2,L):
-    
-    # c matrix will have appearance of c(x)I of dim n x n = nx x ny
-    
-    k1 = (2. * np.pi * x1 / L)
-    k2 = (2. * np.pi * x2 / L)
-    c = 1/(0.5 + (np.cos(k1))**2 + (np.cos(k2))**2 + (np.cos(k1))**4 + (np.cos(k2))**6 )
-            
-    return c
-"""
